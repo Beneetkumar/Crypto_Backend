@@ -1,6 +1,6 @@
 const axios = require('axios');
-const CurrentData = require('../models/CurrentData');
-const HistoryData = require('../models/HistoryData');
+const CurrentData = require('../models/CurrentData.js');
+const HistoryData = require('../models/HistoryData.js');
 const { fetchTopCoins } = require('../services/coingeckoservice.js');
 
 exports.getCoins = async (req, res) => {
