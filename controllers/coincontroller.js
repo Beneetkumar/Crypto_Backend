@@ -3,10 +3,20 @@ const CurrentData = require('../models/CurrentData.js');
 const HistoryData = require('../models/HistoryData.js');
 const { fetchTopCoins } = require('../services/coingeckoservice.js');
 
-exports.getCoins = async (req, res) => {
-  try {
-    const currency = req.query.currency?.toLowerCase() || 'usd';
+const NodeCache = require('node-cache');
 
+const cache = new NodeCache({ stdTTL: 60 }); // Cache for 60 seconds
+
+exports.getCoins = async (req, res) => {
+  const currency = req.query.currency?.toLowerCase() || 'usd';
+  const cacheKey = `coinData_${currency}`; // unique cache key per currency
+
+  const cachedData = cache.get(cacheKey);
+  if (cachedData) {
+    return res.json(cachedData);
+  }
+
+  try {
     const { data } = await axios.get('https://api.coingecko.com/api/v3/coins/markets', {
       params: {
         vs_currency: currency,
@@ -16,28 +26,14 @@ exports.getCoins = async (req, res) => {
       },
     });
 
-    const formattedData = data.map((coin) => ({
-      rank:coin.market_cap_rank,
-      coinId: coin.id || "",
-      name: coin.name || "",
-      symbol: coin.symbol || "",
-      price: coin.current_price ?? 0,
-      marketCap: coin.market_cap ?? 0,
-      change24h: coin.price_change_percentage_24h ?? 0,
-      timestamp: coin.last_updated ? new Date(coin.last_updated) : new Date(),
-      
-    }));
-
-    await CurrentData.deleteMany({});
-    await CurrentData.insertMany(formattedData);
-
-    res.json(formattedData);
+    cache.set(cacheKey, data); // cache result for this currency
+    res.json(data);
   } catch (err) {
-    console.error(" Backend error in /api/coins:", err.message);
-    res.status(500).json({ error: "Internal Server Error" });
+    res
+      .status(err.response?.status || 500)
+      .json({ error: 'API Error', details: err.message });
   }
 };
-
 
 exports.saveHistorySnapshot = async (req, res) => {
   try {
